@@ -85,4 +85,3 @@ public class RefreshTokenEntity {
         return revokedAt == null && expiresAt.isAfter(instant);
     }
 }
-
