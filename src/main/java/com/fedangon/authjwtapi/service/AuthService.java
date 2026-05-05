@@ -4,6 +4,8 @@ import com.fedangon.authjwtapi.dto.auth.AuthResponseDto;
 import com.fedangon.authjwtapi.entity.UserEntity;
 import com.fedangon.authjwtapi.exception.UnauthorizedException;
 import com.fedangon.authjwtapi.security.JwtService;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
@@ -15,6 +17,8 @@ import java.time.Instant;
 
 @Service
 public class AuthService {
+
+    private static final Logger log = LogManager.getLogger(AuthService.class);
 
     private final UserService userService;
     private final RefreshTokenService refreshTokenService;
@@ -40,10 +44,13 @@ public class AuthService {
     public AuthResponseDto register(String email, String password, String fullName) {
         Instant now = Instant.now();
 
+        log.info("Iniciando cadastro de usuario: email={}", UserService.normalizeEmail(email));
         String passwordHash = passwordEncoder.encode(password);
         UserEntity user = userService.createUser(email, passwordHash, fullName, now);
 
-        return issueTokens(user, now);
+        AuthResponseDto response = issueTokens(user, now);
+        log.info("Cadastro realizado com sucesso: userId={} email={}", user.getId(), user.getEmail());
+        return response;
     }
 
     @Transactional
@@ -53,27 +60,33 @@ public class AuthService {
         try {
             authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(email, password));
         } catch (AuthenticationException ex) {
+            log.warn("Falha no login: credenciais invalidas: email={}", UserService.normalizeEmail(email));
             throw new UnauthorizedException("invalid_credentials", "Invalid credentials.");
         }
 
         UserEntity user = userService.getByEmail(email);
-        return issueTokens(user, now);
+        AuthResponseDto response = issueTokens(user, now);
+        log.info("Login realizado com sucesso: userId={} email={}", user.getId(), user.getEmail());
+        return response;
     }
 
     @Transactional
     public AuthResponseDto refresh(String refreshToken) {
         Instant now = Instant.now();
 
+        log.info("Iniciando refresh de tokens");
         UserEntity user = refreshTokenService.validateActiveAndGetUser(refreshToken, now);
         RefreshTokenService.IssuedRefreshToken rotatedRefresh = refreshTokenService.rotate(refreshToken, now);
 
         JwtService.AccessTokenResult accessToken = jwtService.generateAccessToken(user, now);
+        log.info("Refresh realizado com sucesso: userId={} email={}", user.getId(), user.getEmail());
         return new AuthResponseDto("Bearer", accessToken.token(), accessToken.expiresInSeconds(), rotatedRefresh.token());
     }
 
     @Transactional
     public void logout(String refreshToken) {
         Instant now = Instant.now();
+        log.info("Iniciando logout");
         refreshTokenService.revokeIfActive(refreshToken, now);
     }
 

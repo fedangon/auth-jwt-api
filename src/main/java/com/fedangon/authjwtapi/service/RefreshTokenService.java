@@ -5,6 +5,8 @@ import com.fedangon.authjwtapi.entity.RefreshTokenEntity;
 import com.fedangon.authjwtapi.entity.UserEntity;
 import com.fedangon.authjwtapi.exception.UnauthorizedException;
 import com.fedangon.authjwtapi.repository.RefreshTokenRepository;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +19,8 @@ import java.util.Base64;
 
 @Service
 public class RefreshTokenService {
+
+    private static final Logger log = LogManager.getLogger(RefreshTokenService.class);
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final RefreshTokenProperties refreshTokenProperties;
@@ -36,6 +40,8 @@ public class RefreshTokenService {
         RefreshTokenEntity entity = new RefreshTokenEntity(user, tokenHash, expiresAt, now);
         refreshTokenRepository.save(entity);
 
+        log.debug("Refresh token emitido: userId={} expiresAt={} tokenHashPrefix={}",
+                user.getId(), expiresAt, tokenHash.substring(0, 8));
         return new IssuedRefreshToken(rawToken, expiresAt);
     }
 
@@ -47,6 +53,7 @@ public class RefreshTokenService {
                 .orElseThrow(() -> new UnauthorizedException("invalid_refresh_token", "Invalid refresh token."));
 
         if (!entity.isActiveAt(now)) {
+            log.warn("Refresh token rejeitado: token nao esta ativo: tokenHashPrefix={}", tokenHash.substring(0, 8));
             throw new UnauthorizedException("invalid_refresh_token", "Invalid refresh token.");
         }
 
@@ -59,6 +66,10 @@ public class RefreshTokenService {
         refreshTokenRepository.findByTokenHash(tokenHash).ifPresent(entity -> {
             if (entity.isActiveAt(now)) {
                 entity.revoke(now);
+                log.info("Refresh token revogado: userId={} tokenHashPrefix={}",
+                        entity.getUser().getId(), tokenHash.substring(0, 8));
+            } else {
+                log.debug("Revogacao ignorada: refresh token ja estava inativo: tokenHashPrefix={}", tokenHash.substring(0, 8));
             }
         });
     }
@@ -71,10 +82,12 @@ public class RefreshTokenService {
                 .orElseThrow(() -> new UnauthorizedException("invalid_refresh_token", "Invalid refresh token."));
 
         if (!entity.isActiveAt(now)) {
+            log.warn("Rotacao rejeitada: refresh token nao esta ativo: tokenHashPrefix={}", tokenHash.substring(0, 8));
             throw new UnauthorizedException("invalid_refresh_token", "Invalid refresh token.");
         }
 
         entity.revoke(now);
+        log.info("Refresh token rotacionado: userId={} oldTokenHashPrefix={}", entity.getUser().getId(), tokenHash.substring(0, 8));
         return issue(entity.getUser(), now);
     }
 
@@ -109,4 +122,3 @@ public class RefreshTokenService {
     public record IssuedRefreshToken(String token, Instant expiresAt) {
     }
 }
-

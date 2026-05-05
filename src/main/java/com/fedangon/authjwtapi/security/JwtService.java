@@ -2,6 +2,8 @@ package com.fedangon.authjwtapi.security;
 
 import com.fedangon.authjwtapi.config.JwtProperties;
 import com.fedangon.authjwtapi.entity.UserEntity;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -14,6 +16,8 @@ import java.util.List;
 
 @Service
 public class JwtService {
+
+    private static final Logger log = LogManager.getLogger(JwtService.class);
 
     private final JwtEncoder jwtEncoder;
     private final JwtProperties jwtProperties;
@@ -42,10 +46,11 @@ public class JwtService {
 
         String tokenValue = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
         long expiresInSeconds = Math.max(0, expiresAt.getEpochSecond() - now.getEpochSecond());
+        log.debug("Access token gerado: userId={} expiresAt={} expiresInSeconds={}",
+                user.getId(), expiresAt, expiresInSeconds);
         return new AccessTokenResult(tokenValue, expiresInSeconds);
     }
 
     public record AccessTokenResult(String token, long expiresInSeconds) {
     }
 }
-

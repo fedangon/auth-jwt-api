@@ -14,10 +14,17 @@ import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthen
 import org.springframework.security.oauth2.server.resource.web.access.BearerTokenAccessDeniedHandler;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 public class SecurityConfig {
+
+    private final UserIdMdcFilter userIdMdcFilter;
+
+    public SecurityConfig(UserIdMdcFilter userIdMdcFilter) {
+        this.userIdMdcFilter = userIdMdcFilter;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -33,6 +40,8 @@ public class SecurityConfig {
                         .authenticationEntryPoint(new BearerTokenAuthenticationEntryPoint())
                         .accessDeniedHandler(new BearerTokenAccessDeniedHandler())
                 )
+                // Adiciona o userId no MDC para correlacionar logs com o usuario autenticado
+                .addFilterAfter(userIdMdcFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 

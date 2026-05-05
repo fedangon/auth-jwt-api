@@ -5,6 +5,8 @@ import com.fedangon.authjwtapi.entity.UserEntity;
 import com.fedangon.authjwtapi.exception.ConflictException;
 import com.fedangon.authjwtapi.exception.NotFoundException;
 import com.fedangon.authjwtapi.repository.UserRepository;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +16,8 @@ import java.util.UUID;
 
 @Service
 public class UserService {
+
+    private static final Logger log = LogManager.getLogger(UserService.class);
 
     private final UserRepository userRepository;
 
@@ -25,6 +29,7 @@ public class UserService {
     public UserEntity createUser(String email, String passwordHash, String fullName, Instant now) {
         String normalizedEmail = normalizeEmail(email);
         if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
+            log.warn("Cadastro rejeitado: email ja esta em uso: email={}", normalizedEmail);
             throw new ConflictException("email_already_in_use", "Email is already in use.");
         }
 
@@ -36,7 +41,9 @@ public class UserService {
                 Set.of(Role.USER)
         );
 
-        return userRepository.save(user);
+        UserEntity saved = userRepository.save(user);
+        log.info("Usuario criado: userId={} email={}", saved.getId(), saved.getEmail());
+        return saved;
     }
 
     @Transactional(readOnly = true)
@@ -55,4 +62,3 @@ public class UserService {
         return email == null ? null : email.trim().toLowerCase();
     }
 }
-
